@@ -27,6 +27,7 @@ from taiga.base.utils import json
 
 from taiga.mdrender.service import render as mdrender
 from taiga.projects.models import Project
+from taiga.projects.attachments.serializers import BasicAttachmentSerializer
 from taiga.projects.validators import ProjectExistsValidator, UserStoryStatusExistsValidator
 from taiga.projects.milestones.validators import SprintExistsValidator
 from taiga.projects.userstories.validators import UserStoryExistsValidator
@@ -34,6 +35,7 @@ from taiga.projects.notifications.validators import WatchersValidator
 from taiga.projects.serializers import BasicUserStoryStatusSerializer
 from taiga.projects.notifications.mixins import EditableWatchedResourceModelSerializer
 from taiga.projects.votes.mixins.serializers import VoteResourceSerializerMixin
+from taiga.projects.tasks.serializers import BasicTaskSerializer
 
 from taiga.users.serializers import UserBasicInfoSerializer
 
@@ -108,12 +110,32 @@ class UserStorySerializer(WatchersValidator, VoteResourceSerializerMixin, Editab
 
 
 class UserStoryListSerializer(UserStorySerializer):
+    """
+    attachments and tasks fields are filled only if the object has include_attachments
+    and include_tasks attributes correctly filled
+    """
+    attachments = serializers.SerializerMethodField("get_attachments")
+    tasks = serializers.SerializerMethodField("get_tasks")
+
     class Meta:
         model = models.UserStory
         depth = 0
         read_only_fields = ('created_date', 'modified_date')
         exclude=("description", "description_html")
 
+    def get_attachments(self, obj):
+        include_attachments = getattr(obj, "include_attachments", False)
+        if not include_attachments:
+            return []
+
+        return BasicAttachmentSerializer(obj.attachments.all(), many=True).data
+
+    def get_tasks(self, obj):
+        include_tasks = getattr(obj, "include_tasks", False)
+        if not include_tasks:
+            return []
+
+        return BasicTaskSerializer(obj.tasks.all(), many=True).data
 
 class UserStoryNeighborsSerializer(NeighborsSerializerMixin, UserStorySerializer):
     def serialize_neighbor(self, neighbor):

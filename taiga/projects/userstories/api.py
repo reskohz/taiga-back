@@ -91,7 +91,9 @@ class UserStoryViewSet(OCCResourceMixin, VotedResourceMixin, HistoryResourceMixi
         qs = super().get_queryset()
         qs = qs.prefetch_related("role_points",
                                  "role_points__points",
-                                 "role_points__role")
+                                 "role_points__role",
+                                 "tasks",
+                                 "attachments")
         qs = qs.select_related("milestone",
                                "project",
                                "status",
@@ -99,7 +101,15 @@ class UserStoryViewSet(OCCResourceMixin, VotedResourceMixin, HistoryResourceMixi
                                "assigned_to",
                                "generated_from_issue")
         qs = self.attach_votes_attrs_to_queryset(qs)
-        return self.attach_watchers_attrs_to_queryset(qs)
+        qs = self.attach_watchers_attrs_to_queryset(qs)
+
+        if "include_attachments" in self.request.QUERY_PARAMS:
+            qs = qs.extra(select={'include_attachments': "True"})
+
+        if "include_tasks" in self.request.QUERY_PARAMS:
+            qs = qs.extra(select={'include_tasks': "True"})
+
+        return qs
 
     def pre_conditions_on_save(self, obj):
         super().pre_conditions_on_save(obj)
