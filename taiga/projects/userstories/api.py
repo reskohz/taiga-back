@@ -104,10 +104,10 @@ class UserStoryViewSet(OCCResourceMixin, VotedResourceMixin, HistoryResourceMixi
         qs = self.attach_watchers_attrs_to_queryset(qs)
 
         if "include_attachments" in self.request.QUERY_PARAMS:
-            qs = qs.extra(select={'include_attachments': "True"})
+            qs = qs.extra(select={"include_attachments": "True"})
 
         if "include_tasks" in self.request.QUERY_PARAMS:
-            qs = qs.extra(select={'include_tasks': "True"})
+            qs = qs.extra(select={"include_tasks": "True"})
 
         return qs
 
