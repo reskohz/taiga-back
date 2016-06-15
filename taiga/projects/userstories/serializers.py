@@ -16,7 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from django.apps import apps
+from collections import ChainMap
+
+from django.contrib.auth import get_user_model
+from django.utils.translation import ugettext_lazy as _
+
 from taiga.base.api import serializers
 from taiga.base.api.utils import get_object_or_404
 from taiga.base.fields import TagsField
@@ -30,14 +34,20 @@ from taiga.projects.models import Project
 from taiga.projects.validators import ProjectExistsValidator, UserStoryStatusExistsValidator
 from taiga.projects.milestones.validators import SprintExistsValidator
 from taiga.projects.userstories.validators import UserStoryExistsValidator
+from taiga.projects.milestones.validators import SprintExistsValidator
+from taiga.projects.models import Project, UserStoryStatus
+from taiga.projects.mixins.serializers import OwnerExtraInfoMixin, AssigedToExtraInfoMixin, StatusExtraInfoMixin
 from taiga.projects.notifications.validators import WatchersValidator
 from taiga.projects.serializers import BasicUserStoryStatusSerializer
-from taiga.projects.notifications.mixins import EditableWatchedResourceModelSerializer
-from taiga.projects.votes.mixins.serializers import VoteResourceSerializerMixin
+from taiga.projects.notifications.mixins import EditableWatchedResourceModelSerializer, ListWatchedResourceModelSerializer
+from taiga.projects.votes.mixins.serializers import VoteResourceSerializerMixin, ListVoteResourceSerializerMixin
 
-from taiga.users.serializers import UserBasicInfoSerializer
+from taiga.users.serializers import UserBasicInfoSerializer, ListUserBasicInfoSerializer
+from taiga.users.services import get_photo_or_gravatar_url, get_big_photo_or_gravatar_url
 
 from . import models
+
+import serpy
 
 
 class RolePointsField(serializers.WritableField):
@@ -107,12 +117,71 @@ class UserStorySerializer(WatchersValidator, VoteResourceSerializerMixin, Editab
         return mdrender(obj.project, obj.description)
 
 
-class UserStoryListSerializer(UserStorySerializer):
-    class Meta:
-        model = models.UserStory
-        depth = 0
-        read_only_fields = ('created_date', 'modified_date')
-        exclude=("description", "description_html")
+
+class ListOriginIssueSerializer(serializers.LightSerializer):
+    id = serpy.Field()
+    ref = serpy.Field()
+    subject = serpy.Field()
+
+    def to_value(self, instance):
+        if instance is None:
+            return None
+
+        return super().to_value(instance)
+
+
+class UserStoryListSerializer(ListVoteResourceSerializerMixin, ListWatchedResourceModelSerializer,
+        OwnerExtraInfoMixin, AssigedToExtraInfoMixin, StatusExtraInfoMixin, serializers.LightSerializer):
+
+    id = serpy.Field()
+    ref = serpy.Field()
+    milestone = serpy.Field(attr="milestone_id")
+    milestone_slug = serpy.MethodField()
+    milestone_name = serpy.MethodField()
+    project = serpy.Field(attr="project_id")
+    is_closed = serpy.Field()
+    points = serpy.MethodField()
+    backlog_order = serpy.Field()
+    sprint_order = serpy.Field()
+    kanban_order = serpy.Field()
+    created_date = serpy.Field()
+    modified_date = serpy.Field()
+    finish_date = serpy.Field()
+    subject = serpy.Field()
+    client_requirement = serpy.Field()
+    team_requirement = serpy.Field()
+    generated_from_issue = serpy.Field(attr="generated_from_issue_id")
+    external_reference = serpy.Field()
+    tribe_gig = serpy.Field()
+
+    version = serpy.Field()
+    watchers = serpy.Field()
+    is_blocked = serpy.Field()
+    blocked_note = serpy.Field()
+    tags = serpy.Field()
+
+    total_points = serpy.Field("total_points_attr")
+    comment = serpy.MethodField("get_comment")
+    origin_issue = ListOriginIssueSerializer(attr="generated_from_issue")
+
+    def to_value(self, instance):
+        self._serialized_status = {}
+        return super().to_value(instance)
+
+    def get_milestone_slug(self, obj):
+        return obj.milestone.slug if obj.milestone else None
+
+    def get_milestone_name(self, obj):
+        return obj.milestone.name if obj.milestone else None
+
+    def get_points(self, obj):
+        if obj.role_points_attr is None:
+            return {}
+
+        return dict(ChainMap(*json.loads(obj.role_points_attr)))
+
+    def get_comment(self, obj):
+        return ""
 
 
 class UserStoryNeighborsSerializer(NeighborsSerializerMixin, UserStorySerializer):

@@ -70,6 +70,8 @@ import datetime
 import inspect
 import types
 
+import serpy
+
 # Note: We do the following so that users of the framework can use this style:
 #
 #     example_field = serializers.CharField(...)
@@ -1220,3 +1222,11 @@ class HyperlinkedModelSerializer(ModelSerializer):
             "model_name": model_meta.object_name.lower()
         }
         return self._default_view_name % format_kwargs
+
+
+class LightSerializer(serpy.Serializer):
+    def __init__(self, *args, **kwargs):
+        kwargs.pop("read_only", None)
+        kwargs.pop("partial", None)
+        kwargs.pop("files", None)
+        super().__init__(*args, **kwargs)

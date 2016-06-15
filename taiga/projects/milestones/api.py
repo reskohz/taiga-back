@@ -31,21 +31,32 @@ from taiga.projects.notifications.mixins import WatchedResourceMixin, WatchersVi
 from taiga.projects.history.mixins import HistoryResourceMixin
 from taiga.projects.votes.utils import attach_total_voters_to_queryset, attach_is_voter_to_queryset
 from taiga.projects.notifications.utils import attach_watchers_to_queryset, attach_is_watcher_to_queryset
+from taiga.projects.userstories import utils as userstories_utils
 
 from . import serializers
 from . import models
 from . import permissions
+from . import utils as milestones_utils
 
 import datetime
 
 
 class MilestoneViewSet(HistoryResourceMixin, WatchedResourceMixin,
                        BlockedByProjectMixin, ModelCrudViewSet):
-    serializer_class = serializers.MilestoneSerializer
     permission_classes = (permissions.MilestonePermission,)
     filter_backends = (filters.CanViewMilestonesFilterBackend,)
-    filter_fields = ("project", "closed")
+    filter_fields = (
+        "project",
+        "project__slug",
+        "closed"
+    )
     queryset = models.Milestone.objects.all()
+
+    def get_serializer_class(self, *args, **kwargs):
+        if self.action == "list":
+            return serializers.MilestoneListSerializer
+
+        return serializers.MilestoneSerializer
 
     def list(self, request, *args, **kwargs):
         res = super().list(request, *args, **kwargs)
@@ -72,17 +83,17 @@ class MilestoneViewSet(HistoryResourceMixin, WatchedResourceMixin,
 
         # Userstories prefetching
         UserStory = apps.get_model("userstories", "UserStory")
-        us_qs = UserStory.objects.prefetch_related("role_points",
-                                                   "role_points__points",
-                                                   "role_points__role")
 
-        us_qs = us_qs.select_related("milestone",
+        us_qs = UserStory.objects.select_related("milestone",
                                      "project",
                                      "status",
                                      "owner",
                                      "assigned_to",
                                      "generated_from_issue")
 
+        us_qs = userstories_utils.attach_total_points(us_qs)
+        us_qs = userstories_utils.attach_role_points(us_qs)
+        us_qs = attach_total_voters_to_queryset(us_qs)
         us_qs = self.attach_watchers_attrs_to_queryset(us_qs)
 
         if self.request.user.is_authenticated():
@@ -94,7 +105,8 @@ class MilestoneViewSet(HistoryResourceMixin, WatchedResourceMixin,
         # Milestones prefetching
         qs = qs.select_related("project", "owner")
         qs = self.attach_watchers_attrs_to_queryset(qs)
-
+        qs = milestones_utils.attach_total_points(qs)
+        qs = milestones_utils.attach_closed_points(qs)
         qs = qs.order_by("-estimated_start")
         return qs
 

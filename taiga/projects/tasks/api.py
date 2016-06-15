@@ -45,7 +45,12 @@ class TaskViewSet(OCCResourceMixin, VotedResourceMixin, HistoryResourceMixin, Wa
     permission_classes = (permissions.TaskPermission,)
     filter_backends = (filters.CanViewTasksFilterBackend, filters.WatchersFilter)
     retrieve_exclude_filters = (filters.WatchersFilter,)
-    filter_fields = ["user_story", "milestone", "project", "assigned_to",
+    filter_fields = [
+        "user_story",
+        "milestone",
+        "project",
+        "project__slug",
+        "assigned_to",
         "status__is_closed"]
 
     def get_serializer_class(self, *args, **kwargs):
