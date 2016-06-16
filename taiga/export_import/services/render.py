@@ -47,7 +47,7 @@ def render_project(project, outfile, chunk_size = 8190):
         field = serializer.fields.get(field_name)
         field.initialize(parent=serializer, field_name=field_name)
 
-        # These four "special" fields hava attachments so we use them in a special way
+        # # These four "special" fields hava attachments so we use them in a special way
         if field_name in ["wiki_pages", "user_stories", "tasks", "issues"]:
             value = get_component(project, field_name)
             if field_name != "wiki_pages":
@@ -62,6 +62,15 @@ def render_project(project, outfile, chunk_size = 8190):
             if attachments_field:
                 attachments_field.initialize(parent=field, field_name="attachments")
 
+            if field_name == 'wiki_pages':
+                field_serializer = serializers.WikiPageExportSerializer
+            elif field_name == 'user_stories':
+                field_serializer = serializers.UserStoryExportSerializerSerpy
+            elif field_name == 'tasks':
+                field_serializer = serializers.TaskExportSerializerSerpy
+            elif field_name == 'issues':
+                field_serializer = serializers.IssueExportSerializerSerpy
+
             first_item = True
             for item in value.iterator():
                 # Avoid writing "," in the last element
@@ -71,9 +80,9 @@ def render_project(project, outfile, chunk_size = 8190):
                     first_item = False
 
 
-                dumped_value = json.dumps(field.to_native(item))
-                writing_value = dumped_value[:-1]+ ',\n    "attachments": [\n'
-                outfile.write(writing_value.encode())
+                dumped_value = json.dumps(field_serializer(item).data)
+                dumped_value = ""
+                outfile.write((dumped_value[:-1]+ ',\n    "attachments": [\n').encode())
 
                 first_attachment = True
                 for attachment in item.attachments.iterator():
@@ -123,7 +132,8 @@ def render_project(project, outfile, chunk_size = 8190):
         else:
             first_timeline = False
 
-        dumped_value = json.dumps(serializers.TimelineExportSerializer(timeline_item).data)
+        dumped_value = json.dumps(serializers.TimelineExportSerializerSerpy(timeline_item).data)
+        dumped_value = ""
         outfile.write(dumped_value.encode())
 
     outfile.write(b']}\n')
